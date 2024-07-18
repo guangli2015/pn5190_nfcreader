@@ -388,10 +388,10 @@ static phStatus_t phhalHw_Pn5190_EnBootNormalMode(phhalHw_Pn5190_DataParams_t * 
 	
 #ifdef PHDRIVER_nRF52840_PNEV5190B_BOARD
 		/* Delay of ~100us */
-	/*	(void)phDriver_TimerStart(
+		(void)phDriver_TimerStart(
 			PH_DRIVER_TIMER_MICRO_SECS,
 			100,
-			NULL);*/
+			NULL);
 #endif
 	
 	/* End of MK Code Addition */
