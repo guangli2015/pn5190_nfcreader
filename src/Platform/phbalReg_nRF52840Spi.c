@@ -25,6 +25,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/spi.h>
 #include <zephyr/kernel.h>
 #include <stddef.h>
 #include <zephyr/types.h>
@@ -59,10 +60,12 @@ static const struct spi_config spi_cfg =  {
 	.slave = DT_REG_ADDR(PN5190_NODE),
 	.cs = {
 		.gpio = SPI_CS_GPIOS_DT_SPEC_GET(PN5190_NODE),
-		.delay = T_NCS_SCLK
+		.delay = 0
 	}
 };
 #endif
+
+const struct gpio_dt_spec my_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, boardreset_gpios);
 phStatus_t phbalReg_Init(
                          void * pDataParams,
                          uint16_t wSizeOfDataParams
