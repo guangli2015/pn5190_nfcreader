@@ -48,7 +48,7 @@ static void phbalReg_SpiInit(void);
 static uint32_t dwSpiBaudRate = PHDRIVER_KSDK_SPI_DATA_RATE;
 #endif /* PERF_TEST */
 static     uint8_t g_dummyBuffer[RX_BUFFER_SIZE_MAX];
-#if 0
+#if 1
 static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(PN5190_NODE));
 /* SPI hardware configuration. */
 static const struct spi_config spi_cfg =  {
