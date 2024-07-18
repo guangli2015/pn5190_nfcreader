@@ -1668,8 +1668,8 @@ phStatus_t phhalHw_Pn5190_Int_UserAbort(
 #ifndef PH_OSAL_LINUX
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-value"
-        __DSB;
-        __ISB;
+       // __DSB;
+       // __ISB;
 #pragma GCC diagnostic pop
 #endif /* PH_OSAL_LINUX */
         status = phhalHw_Pn5190_Send(pDataParams,&aCmd[0], 4, PH_OFF);

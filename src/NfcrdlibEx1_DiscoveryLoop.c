@@ -140,7 +140,7 @@ printk("PH_PLATFORM_HAS_ICFRONTEND...............\n");
         (void)phOsal_Init();
 
         DEBUG_PRINTF("\n DiscoveryLoop Example: \n");
- #if 0
+
 #ifdef PH_PLATFORM_HAS_ICFRONTEND
         status = phbalReg_Init(&sBalParams, sizeof(phbalReg_Type_t));
         CHECK_STATUS(status);
@@ -168,7 +168,7 @@ printk("PH_PLATFORM_HAS_ICFRONTEND...............\n");
         status = phApp_Configure_IRQ();
         CHECK_STATUS(status);
         if(status != PH_ERR_SUCCESS) break;
-
+ #if 1
 #ifndef PH_OSAL_NULLOS
 
         DiscLoop.pTaskName = (uint8_t *)bTaskName;
@@ -190,7 +190,7 @@ printk("PH_PLATFORM_HAS_ICFRONTEND...............\n");
     while(1);
     return 0;
 }
-#if 0
+#if 1
 /**
 * This function demonstrates the usage of discovery loop.
 * The discovery loop can run with default setting Or can be configured as demonstrated and
