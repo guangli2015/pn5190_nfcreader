@@ -51,11 +51,16 @@
 
 static pphDriver_TimerCallBck_t pPitTimerCallBack;
 static volatile uint8_t dwTimerExp;
-
+static struct gpio_callback int_cb_data;
 /* *****************************************************************************************************************
  * Private Functions Prototypes
  * ***************************************************************************************************************** */
+void isr_callback(const struct device *dev, struct gpio_callback *cb,
+		    uint32_t pins)
+{
+	
 
+}
 
 void my_timer_handler(struct k_timer *dummy)
 {
@@ -76,20 +81,22 @@ phStatus_t phDriver_TimerStart(phDriver_Timer_Unit_t eTimerUnit, uint32_t dwTime
   
 
 	pPitTimerCallBack = pTimerCallBack;
-	
-	if(PH_DRIVER_TIMER_SECS == eTimerUnit)
-   	{
-   	     k_timer_start(&my_timer, K_SECONDS(dwTimePeriod), K_NO_WAIT);
-   	}
-   else if(PH_DRIVER_TIMER_MILLI_SECS == eTimerUnit)
-   	{
-   		
-		 k_timer_start(&my_timer, K_MSEC(dwTimePeriod), K_NO_WAIT);
-   	}
-   else if(PH_DRIVER_TIMER_MICRO_SECS == eTimerUnit)
-   	{
-   		k_timer_start(&my_timer, K_USEC(dwTimePeriod), K_NO_WAIT);
-   	}
+	switch(eTimerUnit)
+	{
+		case PH_DRIVER_TIMER_SECS:
+				  k_timer_start(&my_timer, K_SECONDS(dwTimePeriod), K_NO_WAIT);
+				  break;
+		case PH_DRIVER_TIMER_MILLI_SECS:
+				   k_timer_start(&my_timer, K_MSEC(dwTimePeriod), K_NO_WAIT);
+				   break;
+		case PH_DRIVER_TIMER_MICRO_SECS:
+				 k_timer_start(&my_timer, K_USEC(dwTimePeriod), K_NO_WAIT);
+				   break;
+				   default:
+				   break;
+
+	}
+
 
    	if(NULL == pTimerCallBack)
     	{
@@ -168,9 +175,15 @@ phStatus_t phDriver_PinConfig(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc
 			case PH_DRIVER_PINFUNC_INPUT:
 			gpio_pin_configure(dev_gpioX, bPinNum, GPIO_INPUT);
 				break;
+			case PH_DRIVER_PINFUNC_INTERRUPT:
+			 gpio_pin_configure(dev_gpioX, bPinNum ,GPIO_INPUT);
+		 	 gpio_pin_interrupt_configure(dev_gpioX,bPinNum,GPIO_INT_EDGE_TO_ACTIVE);
+			 gpio_init_callback(&int_cb_data, isr_callback, BIT(bPinNum));
+			 gpio_add_callback(dev_gpioX, &int_cb_data);
+			 break;
 		}
 
-
+#if 0
     if(ePinFunc == PH_DRIVER_PINFUNC_INTERRUPT)
     {
         /*eInterruptType = aInterruptTypes[(uint8_t)pPinConfig->eInterruptConfig];
@@ -179,7 +192,7 @@ phStatus_t phDriver_PinConfig(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc
         gpio_pin_configure(dev_gpioX, bPinNum ,GPIO_INPUT);
 		 gpio_pin_interrupt_configure(dev_gpioX,bPinNum,GPIO_INT_EDGE_TO_ACTIVE);
     }
-
+#endif
    // GPIO_PinInit((GPIO_Type *)pGpiosBaseAddr[bPortGpio], bPinNum, &sGpioConfig);
 
     return PH_DRIVER_SUCCESS;
@@ -304,10 +317,10 @@ phStatus_t phDriver_IRQPinRead(uint32_t dwPinNumber)
 
 void phDriver_EnterCriticalSection(void)
 {
-    __disable_irq();
+  //  __disable_irq();
 }
 
 void phDriver_ExitCriticalSection(void)
 {
-    __enable_irq();
+ //   __enable_irq();
 }

@@ -18,6 +18,11 @@
  */
 #include <phOsal.h>
 #include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/printk.h>
+#include <inttypes.h>
 
 
 /* *****************************************************************************************************************
@@ -35,11 +40,11 @@
 /* *****************************************************************************************************************
  * Global and Static Variables
  * Total Size: NNNbytes
- * ***************************************************************************************************************** */
+ * ***************************************************************************************************************** 
 static volatile uint8_t gbWaitTimedOut;
 static volatile uint32_t gdwEvents[PH_OSAL_CONFIG_MAX_NUM_EVENTS];
 static volatile uint32_t gdwEventBitMap;
-
+*/
 
 
  static struct k_event  my_event_queue[5];
@@ -48,7 +53,7 @@ static volatile uint32_t gdwEventBitMap;
 /* *****************************************************************************************************************
  * Private Functions Prototypes
  * ***************************************************************************************************************** */
-static phStatus_t phOsal_NullOs_GetFreeIndex(uint32_t * dwFreeIndex, uint32_t dwBitMap, uint32_t dwMaxLimit);
+//static phStatus_t phOsal_NullOs_GetFreeIndex(uint32_t * dwFreeIndex, uint32_t dwBitMap, uint32_t dwMaxLimit);
 
 static phStatus_t phOsal_NullOs_ReturnUnsupportedCmd(void);
 /* *****************************************************************************************************************
@@ -56,8 +61,8 @@ static phStatus_t phOsal_NullOs_ReturnUnsupportedCmd(void);
  * ***************************************************************************************************************** */
 phStatus_t phOsal_Init(void)
 {
-    gbWaitTimedOut = 0;
-    gdwEventBitMap = 0;
+   // gbWaitTimedOut = 0;
+   // gdwEventBitMap = 0;
 
    // return phOsal_InitTickTimer(&phOsal_NullOsSysTickHandler);
    return PH_OSAL_SUCCESS;
@@ -83,8 +88,13 @@ phStatus_t phOsal_EventCreate(phOsal_Event_t *eventHandle, pphOsal_EventObj_t ev
 */
 
 	uint8_t index;
+
+     if ((eventHandle == NULL) || (eventObj == NULL))
+    {
+        return PH_OSAL_ADD_COMPCODE(PH_OSAL_ERROR, PH_COMP_OSAL);
+    }
 	
-#if 0
+#if 1
 	for(index=0;index<5;index++)
 		{	
 			if(eventqueue_use_flag[index]==false)
@@ -98,7 +108,7 @@ phStatus_t phOsal_EventCreate(phOsal_Event_t *eventHandle, pphOsal_EventObj_t ev
 		{
 			return PH_OSAL_ADD_COMPCODE(PH_OSAL_ERROR, PH_COMP_OSAL);
 		}
-	
+	eventqueue_use_flag[index]=true;
 	k_event_init(&(my_event_queue[index]));
 	*eventHandle = (phOsal_Event_t)(&(my_event_queue[index]));
 	 eventObj->EventHandle = (phOsal_Event_t)(&(my_event_queue[index]));
@@ -169,45 +179,55 @@ phStatus_t phOsal_EventPend(volatile phOsal_Event_t * eventHandle, phOsal_EventO
         (*((uint32_t *)(*eventHandle))) &= (~(FlagsToWait & (*((uint32_t *)(*eventHandle)))));
     }
     phOsal_ExitCriticalSection();
+#endif
 
 
 
+	uint32_t  events;
+    if((eventHandle == NULL) || ((*eventHandle) == NULL))
+    {
+        return PH_OSAL_ADD_COMPCODE(PH_OSAL_ERROR, PH_COMP_OSAL);
+    }
 
-	  uint32_t  events;
 	if((options & E_OS_EVENT_OPT_PEND_SET_ALL))
 	{	
-		if(options & E_OS_EVENT_OPT_PEND_CLEAR_ON_EXIT)
+		/*if(options & E_OS_EVENT_OPT_PEND_CLEAR_ON_EXIT)
 			{
-				events = k_event_wait_all((k_event *)eventHandle, FlagsToWait, true, K_TICKS(ticksToWait));
+				events = k_event_wait_all((k_event *)(*eventHandle), FlagsToWait, true, K_TICKS(ticksToWait));
 			}
-		else
-			{
-				events = k_event_wait_all((k_event *)eventHandle, FlagsToWait, false, K_TICKS(ticksToWait));
-			}
+		else*/
+			
+			events = k_event_wait_all((struct k_event *)(*eventHandle), FlagsToWait, false, K_TICKS(ticksToWait));
+			
 	}
 	else
 		{
-			if(options & E_OS_EVENT_OPT_PEND_CLEAR_ON_EXIT)
+			/*if(options & E_OS_EVENT_OPT_PEND_CLEAR_ON_EXIT)
 			{
-				events = k_event_wait((k_event *)eventHandle, FlagsToWait, true, K_TICKS(ticksToWait));
+				events = k_event_wait((k_event *)(*eventHandle), FlagsToWait, true, K_TICKS(ticksToWait));
 			}
-			else
-			{
-				events = k_event_wait((k_event *)eventHandle, FlagsToWait, false, K_TICKS(ticksToWait));
-			}
+			else*/
+			
+			events = k_event_wait((struct k_event *)(*eventHandle), FlagsToWait, false, K_TICKS(ticksToWait));
+			
 		}
-  
-    if (events == 0) {
-        printk("No input devices are available!");
-    } else {
 
-		 if (pCurrFlags != NULL)
+    if (events == 0) {
+         printk("No input devices are available!");
+         status = PH_OSAL_IO_TIMEOUT;
+    } 
+    else {
+        status = PH_OSAL_SUCCESS;
+    }
+    
+    if(options & E_OS_EVENT_OPT_PEND_CLEAR_ON_EXIT)
+    {
+        k_event_clear((struct k_event *)(*eventHandle),FlagsToWait);
+    }
+    if (pCurrFlags != NULL)
     	{
     	    *pCurrFlags = events;
     	}
-       status = PH_OSAL_SUCCESS;
-    }
-#endif
     return PH_OSAL_ADD_COMPCODE(status, PH_COMP_OSAL);
 }
 
@@ -235,14 +255,15 @@ phStatus_t phOsal_EventPost(phOsal_Event_t * eventHandle, phOsal_EventOpt_t opti
 
     phOsal_WakeUp();
 #endif
-#if 0 
+
 	uint32_t event_posted;
-	event_posted= k_event_post((k_event *)eventHandle, FlagsToPost);
+	 k_event_post((struct k_event *)(*eventHandle), FlagsToPost);
 	 if (pCurrFlags != NULL)
 	   {
+            event_posted=k_event_test((struct k_event *)(*eventHandle), 0xffffffff);
 		   *pCurrFlags = event_posted;
 	   }
-#endif
+
     return PH_OSAL_SUCCESS;
 
     }
@@ -268,7 +289,14 @@ phStatus_t phOsal_EventClear(phOsal_Event_t * eventHandle, phOsal_EventOpt_t opt
     /* Exit Critical Section. */
     phOsal_ExitCriticalSection();
 #endif
-//	k_event_clear((k_event *)eventHandle, FlagsToClear);
+uint32_t event_posted;
+	
+	 if (pCurrFlags != NULL)
+	   {
+            event_posted=k_event_test((struct k_event *)(*eventHandle), 0xffffffff);
+		   *pCurrFlags = event_posted;
+	   }
+	k_event_clear((struct k_event *)(*eventHandle), FlagsToClear);
 
     return PH_OSAL_SUCCESS;
 }
@@ -417,7 +445,7 @@ static phStatus_t phOsal_NullOs_ReturnUnsupportedCmd(void)
 {
     return (PH_OSAL_UNSUPPORTED_COMMAND | PH_COMP_OSAL);
 }
-
+/*
 static phStatus_t phOsal_NullOs_GetFreeIndex(uint32_t * dwFreeIndex, uint32_t dwBitMap, uint32_t dwMaxLimit)
 {
     phStatus_t status;
@@ -440,5 +468,5 @@ static phStatus_t phOsal_NullOs_GetFreeIndex(uint32_t * dwFreeIndex, uint32_t dw
 
     return status;
 }
-
+*/
 
