@@ -55,13 +55,15 @@ static struct gpio_callback int_cb_data;
 static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, boardreset_gpios);
 static const struct gpio_dt_spec irq_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, irq_gpios);
 static struct gpio_callback irq_cb_data;
+K_EVENT_DEFINE(my_event);
 /* *****************************************************************************************************************
  * Private Functions Prototypes
  * ***************************************************************************************************************** */
 void isr_callback(const struct device *dev, struct gpio_callback *cb,
 		    uint32_t pins)
 {
-	
+	k_event_post(&my_event, 0x1);
+	printk("###");
 
 }
 
@@ -96,6 +98,7 @@ phStatus_t phDriver_TimerStart(phDriver_Timer_Unit_t eTimerUnit, uint32_t dwTime
 				 k_timer_start(&my_timer, K_USEC(dwTimePeriod), K_NO_WAIT);
 				   break;
 				   default:
+				   printk("phDriver_TimerStart eTimerUnit err\n");
 				   break;
 
 	}
@@ -213,7 +216,11 @@ phStatus_t phDriver_IRQPinPoll(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFun
     }
 	if(PHDRIVER_PIN_IRQ == dwPinNumber)
 		{     
-			while(phDriver_PinRead(dwPinNumber, ePinFunc) == bGpioState);
+			//while(phDriver_PinRead(dwPinNumber, ePinFunc) == bGpioState);
+printk("phDriver_IRQPinPoll_1\n");
+					 k_event_wait(&my_event, 0x007, false,K_FOREVER);
+					k_event_clear(&my_event,0x1);
+					printk("phDriver_IRQPinPoll_2\n");
 		}
 
     return PH_DRIVER_SUCCESS;

@@ -23,7 +23,7 @@
 		compatible = "nxp,pn5190";
 		reg = <0>;
 		spi-max-frequency = <5000000>;
-		irq-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH|GPIO_PULL_DOWN)>;
+		irq-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH|GPIO_PULL_UP)>;
 		boardreset-gpios = <&gpio0 29 (GPIO_ACTIVE_HIGH|GPIO_PULL_UP)>;
 	};
 };
