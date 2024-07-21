@@ -42,7 +42,7 @@
 /* *****************************************************************************************************************
  * Type Definitions
  * ***************************************************************************************************************** */
-
+#define PN5190_NODE		DT_INST(0, nxp_pn5190)
 /* *****************************************************************************************************************
  * Global and Static Variables
  * Total Size: NNNbytes
@@ -52,6 +52,9 @@
 static pphDriver_TimerCallBck_t pPitTimerCallBack;
 static volatile uint8_t dwTimerExp;
 static struct gpio_callback int_cb_data;
+static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, boardreset_gpios);
+static const struct gpio_dt_spec irq_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, irq_gpios);
+static struct gpio_callback irq_cb_data;
 /* *****************************************************************************************************************
  * Private Functions Prototypes
  * ***************************************************************************************************************** */
@@ -116,10 +119,10 @@ phStatus_t phDriver_TimerStop(void)
 phStatus_t phDriver_PinConfig(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc, phDriver_Pin_Config_t *pPinConfig)
 {
     //gpio_pin_config_t sGpioConfig;
-    uint8_t bPinNum;
-    uint8_t bPortGpio;
-	struct device *dev_gpioX;
-
+   // uint8_t bPinNum;
+    //uint8_t bPortGpio;
+	//struct device *dev_gpioX;
+int ret;
     //port_interrupt_t eInterruptType;
     /*port_pin_config_t sPinConfig =
     {
@@ -137,7 +140,17 @@ phStatus_t phDriver_PinConfig(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc
         return PH_DRIVER_ERROR | PH_COMP_DRIVER;
     }
 
-    /* Extract the Pin, Gpio, Port details from dwPinNumber */
+	if (!gpio_is_ready_dt(&reset_gpio)) {
+		printk("Error: reset_gpio device %s is not ready\n",
+		       reset_gpio.port->name);
+		return PH_DRIVER_ERROR | PH_COMP_DRIVER;;
+	}
+	if (!gpio_is_ready_dt(&irq_gpio)) {
+		printk("Error: irq_gpio device %s is not ready\n",
+		       irq_gpio.port->name);
+		return PH_DRIVER_ERROR | PH_COMP_DRIVER;;
+	}
+    /* Extract the Pin, Gpio, Port details from dwPinNumber
 	if(dwPinNumber<32)
 		{
     		bPinNum = (uint8_t)(dwPinNumber);
@@ -147,99 +160,42 @@ phStatus_t phDriver_PinConfig(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc
 		{
 			bPinNum = (uint8_t)(dwPinNumber-32);
     		bPortGpio = (uint8_t)(1);
-		}
+		} */
+    switch(dwPinNumber)
+	{
+		case PHDRIVER_PIN_RESET:
+			gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT);
+			gpio_pin_set_dt(&reset_gpio, pPinConfig->bOutputLogic);
+			break;
+		case PHDRIVER_PIN_IRQ:
+			gpio_pin_configure_dt(&irq_gpio, GPIO_INPUT);
+			ret = gpio_pin_interrupt_configure_dt(&irq_gpio,
+					      GPIO_INT_EDGE_TO_ACTIVE);
+			if (ret != 0) {
+				return PH_DRIVER_ERROR | PH_COMP_DRIVER;;
+			}
+			gpio_init_callback(&irq_cb_data, isr_callback, BIT(irq_gpio.pin));
+			gpio_add_callback(irq_gpio.port, &irq_cb_data);
+			break;
+				
 
-   /* sGpioConfig.pinDirection = (ePinFunc == PH_DRIVER_PINFUNC_OUTPUT)?GPIO_OUTPUT:GPIO_INPUT;
-    sGpioConfig.outputLogic  =  pPinConfig->bOutputLogic;
-    sPinConfig.pullSelect = (pPinConfig->bPullSelect == PH_DRIVER_PULL_DOWN)? kPORT_PullDown : kPORT_PullUp;
-
-    CLOCK_EnableClock(pPortsClock[bPortGpio]);
-    PORT_SetPinConfig((PORT_Type *)pPortsBaseAddr[bPortGpio], bPinNum, &sPinConfig);*/
-	if(bPortGpio == 0)
-		{
-			//获取GPIO Port的句柄
-			dev_gpioX  = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-		}
-	else if(bPortGpio == 1)
-		{
-			//获取GPIO Port的句柄
-			dev_gpioX = DEVICE_DT_GET(DT_NODELABEL(gpio1));
-		}
-
-	switch( ePinFunc )
-		{
-		    case PH_DRIVER_PINFUNC_OUTPUT:
-				gpio_pin_configure(dev_gpioX, bPinNum, GPIO_OUTPUT);
-				gpio_pin_set(dev_gpioX, bPinNum, pPinConfig->bOutputLogic);
-				break;
-			case PH_DRIVER_PINFUNC_INPUT:
-			gpio_pin_configure(dev_gpioX, bPinNum, GPIO_INPUT);
-				break;
-			case PH_DRIVER_PINFUNC_INTERRUPT:
-			 gpio_pin_configure(dev_gpioX, bPinNum ,GPIO_INPUT);
-		 	 gpio_pin_interrupt_configure(dev_gpioX,bPinNum,GPIO_INT_EDGE_TO_ACTIVE);
-			 gpio_init_callback(&int_cb_data, isr_callback, BIT(bPinNum));
-			 gpio_add_callback(dev_gpioX, &int_cb_data);
-			 break;
-		}
-
-#if 0
-    if(ePinFunc == PH_DRIVER_PINFUNC_INTERRUPT)
-    {
-        /*eInterruptType = aInterruptTypes[(uint8_t)pPinConfig->eInterruptConfig];
-        GPIO_PortClearInterruptFlags((GPIO_Type *)pGpiosBaseAddr[bPortGpio], bPinNum);
-        PORT_SetPinInterruptConfig((PORT_Type *)pPortsBaseAddr[bPortGpio], bPinNum, eInterruptType);*/
-        gpio_pin_configure(dev_gpioX, bPinNum ,GPIO_INPUT);
-		 gpio_pin_interrupt_configure(dev_gpioX,bPinNum,GPIO_INT_EDGE_TO_ACTIVE);
-    }
-#endif
-   // GPIO_PinInit((GPIO_Type *)pGpiosBaseAddr[bPortGpio], bPinNum, &sGpioConfig);
+	}
 
     return PH_DRIVER_SUCCESS;
 }
 
 uint8_t phDriver_PinRead(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc)
 {
-    uint8_t bValue;
-    uint8_t bPinNum;
-    uint8_t bPortGpio;
 
-	int value = 0;
-	struct device *dev_gpioX;
-
-    /* Extract the Pin, Gpio details from dwPinNumber */
-   // bPinNum = (uint8_t)(dwPinNumber & 0xFF);
-   // bGpioNum = (uint8_t)((dwPinNumber & 0xFF00)>>8);
-   
-	/* Extract the Pin, Gpio, Port details from dwPinNumber */
-		if(dwPinNumber<32)
-			{
-				bPinNum = (uint8_t)(dwPinNumber);
-				bPortGpio = (uint8_t)(0);
-			}
-		else if(dwPinNumber>=32)
-			{
-				bPinNum = (uint8_t)(dwPinNumber-32);
-				bPortGpio = (uint8_t)(1);
-			}
-
-		if(bPortGpio == 0)
-		{
-			//获取GPIO Port的句柄
-			dev_gpioX  = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+		int value = 0;
+		if(PHDRIVER_PIN_IRQ == dwPinNumber)
+		{     
+			value = gpio_pin_get_dt(&irq_gpio);
+			value = (value < 0) ? 0 : value;
 		}
-	else if(bPortGpio == 1)
-		{
-			//获取GPIO Port的句柄
-			dev_gpioX = DEVICE_DT_GET(DT_NODELABEL(gpio1));
-		}
+	return value;
 
-		value = gpio_pin_get(dev_gpioX, bPinNum);
-		value = (value < 0) ? 0 : value;
-	
-        bValue = value;  
-
-    return bValue;
+  
 }
 
 phStatus_t phDriver_IRQPinPoll(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFunc, phDriver_Interrupt_Config_t eInterruptType)
@@ -255,46 +211,23 @@ phStatus_t phDriver_IRQPinPoll(uint32_t dwPinNumber, phDriver_Pin_Func_t ePinFun
     {
         bGpioState = 1;
     }
-
-	while(phDriver_PinRead(dwPinNumber, ePinFunc) == bGpioState);
+	if(PHDRIVER_PIN_IRQ == dwPinNumber)
+		{     
+			while(phDriver_PinRead(dwPinNumber, ePinFunc) == bGpioState);
+		}
 
     return PH_DRIVER_SUCCESS;
 }
 
 void phDriver_PinWrite(uint32_t dwPinNumber, uint8_t bValue)
 {
-    uint8_t bPinNum;
-    uint8_t bPortGpio;
+ 
 
 
-	struct device *dev_gpioX;
-	
-
-	   
-		/* Extract the Pin, Gpio, Port details from dwPinNumber */
-			if(dwPinNumber<32)
-				{
-					bPinNum = (uint8_t)(dwPinNumber);
-					bPortGpio = (uint8_t)(0);
-				}
-			else if(dwPinNumber>=32)
-				{
-					bPinNum = (uint8_t)(dwPinNumber-32);
-					bPortGpio = (uint8_t)(1);
-				}
-	
-			if(bPortGpio == 0)
-			{
-				//获取GPIO Port的句柄
-				dev_gpioX  = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-			}
-		else if(bPortGpio == 1)
-			{
-				//获取GPIO Port的句柄
-				dev_gpioX = DEVICE_DT_GET(DT_NODELABEL(gpio1));
-			}
-	
-			gpio_pin_set(dev_gpioX, bPinNum, bValue);
+		if(PHDRIVER_PIN_RESET == dwPinNumber)
+		{     
+				gpio_pin_set_dt(&reset_gpio,bValue);
+		}
 
 }
 

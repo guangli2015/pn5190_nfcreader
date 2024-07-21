@@ -37,11 +37,9 @@
 #define PN5190_NODE		DT_INST(0, nxp_pn5190)
 #define PHBAL_REG_KINETIS_SPI_ID               0x0FU       /**< ID for Kinetis SPI BAL component */
 
-#ifndef PHDRIVER_KSDK_SPI_POLLING
-dspi_rtos_handle_t g_masterHandle;
-#endif
 
-#define RX_BUFFER_SIZE_MAX                     272U /* Receive Buffer size while exchange */
+
+#define RX_BUFFER_SIZE_MAX                     512 /* Receive Buffer size while exchange */
 
 static void phbalReg_SpiInit(void);
 
@@ -65,7 +63,7 @@ static const struct spi_config spi_cfg =  {
 };
 #endif
 
-const struct gpio_dt_spec my_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, boardreset_gpios);
+//const struct gpio_dt_spec my_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, boardreset_gpios);
 phStatus_t phbalReg_Init(
                          void * pDataParams,
                          uint16_t wSizeOfDataParams
@@ -79,19 +77,19 @@ phStatus_t phbalReg_Init(
 
     ((phbalReg_Type_t *)pDataParams)->wId      = PH_COMP_DRIVER | PHBAL_REG_KINETIS_SPI_ID;
     ((phbalReg_Type_t *)pDataParams)->bBalType = PHBAL_REG_TYPE_SPI;
-#if 0
-	LOG_DBG("Initializing. SPI device: %s, CS GPIO: %s pin %d",
+#if 1
+	printk("Initializing. SPI device: %s, CS GPIO: %s pin %d",
 		spi_dev->name, spi_cfg.cs.gpio.port->name, spi_cfg.cs.gpio.pin);
 
 	if (!device_is_ready(spi_cfg.cs.gpio.port)) {
-		LOG_ERR("GPIO device %s is not ready!", spi_cfg.cs.gpio.port->name);
+		printk("GPIO device %s is not ready!", spi_cfg.cs.gpio.port->name);
 
-		return -ENXIO;
+		   return (PH_DRIVER_ERROR | PH_COMP_DRIVER);
 	}
 
 	if (!device_is_ready(spi_dev)) {
-		LOG_ERR("SPI device %s is not ready!", spi_dev->name);
-		return -ENXIO;
+		printk("SPI device %s is not ready!", spi_dev->name);
+		return (PH_DRIVER_ERROR | PH_COMP_DRIVER);
 	}
 #endif
 
@@ -114,7 +112,7 @@ phStatus_t phbalReg_Exchange(
    // dspi_transfer_t g_masterXfer;
 	int err;
 
-#if 0
+#if 1
   //  memset(&g_masterXfer, 0, sizeof(dspi_transfer_t));
 
 
@@ -152,7 +150,7 @@ phStatus_t phbalReg_Exchange(
 
 			err = spi_transceive(spi_dev, &spi_cfg, &tx, &rx);
 			if (err) {
-				LOG_ERR("SPI reg read failed, err: %d.", err);
+				printk("SPI reg read failed, err: %d.", err);
 				
 			}
     }
@@ -161,7 +159,7 @@ phStatus_t phbalReg_Exchange(
         //pRxBuf = pRxBuffer;
         err = spi_transceive(spi_dev, &spi_cfg, &tx, NULL);
 			if (err) {
-				LOG_ERR("SPI direct command failed, err: %d.", err);
+				printk("SPI direct command failed, err: %d.", err);
 				
 			}
     }

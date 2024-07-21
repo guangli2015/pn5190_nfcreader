@@ -4,6 +4,7 @@
         "board_nrf52840_pnev5190b.h": "c",
         "phapp_init.h": "c",
         "phdriver.h": "c",
-        "phosal.h": "c"
+        "phosal.h": "c",
+        "typeinfo": "c"
     }
 }
