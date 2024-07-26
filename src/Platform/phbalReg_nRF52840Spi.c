@@ -53,8 +53,7 @@ static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(PN5190_NODE));
 static const struct spi_config spi_cfg =  {
 	.frequency = DT_PROP(PN5190_NODE, spi_max_frequency),
 	.operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) |
-		      SPI_TRANSFER_MSB | SPI_LINES_SINGLE |
-		      SPI_MODE_CPHA),
+		      SPI_TRANSFER_MSB),
 	.slave = DT_REG_ADDR(PN5190_NODE),
 	.cs = {
 		.gpio = SPI_CS_GPIOS_DT_SPEC_GET(PN5190_NODE),

@@ -31,6 +31,7 @@
 #include "phDriver.h"
 #include "BoardSelection.h"
 
+#include "phApp_Init.h"
 
 
 
@@ -56,14 +57,26 @@ static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, boar
 static const struct gpio_dt_spec irq_gpio = GPIO_DT_SPEC_GET(PN5190_NODE, irq_gpios);
 static struct gpio_callback irq_cb_data;
 K_EVENT_DEFINE(my_event);
+static bool inited=false;
 /* *****************************************************************************************************************
  * Private Functions Prototypes
  * ***************************************************************************************************************** */
 void isr_callback(const struct device *dev, struct gpio_callback *cb,
 		    uint32_t pins)
 {
-	k_event_post(&my_event, 0x1);
-	printk("###");
+	if(false == inited)
+	{
+		k_event_post(&my_event, 0x1);
+		inited=true;
+		printk("\n&&\n");
+	}
+	else
+	{
+		CLIF_IRQHandler();
+			//printk("!");
+	}
+	
+	
 
 }
 
@@ -175,7 +188,7 @@ int ret;
 			ret = gpio_pin_interrupt_configure_dt(&irq_gpio,
 					      GPIO_INT_EDGE_TO_ACTIVE);
 			if (ret != 0) {
-				return PH_DRIVER_ERROR | PH_COMP_DRIVER;;
+				return PH_DRIVER_ERROR | PH_COMP_DRIVER;
 			}
 			gpio_init_callback(&irq_cb_data, isr_callback, BIT(irq_gpio.pin));
 			gpio_add_callback(irq_gpio.port, &irq_cb_data);

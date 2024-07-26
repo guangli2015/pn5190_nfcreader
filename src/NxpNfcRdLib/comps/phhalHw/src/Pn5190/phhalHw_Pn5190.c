@@ -372,7 +372,7 @@ static phStatus_t phhalHw_Pn5190_EnBootNormalMode(phhalHw_Pn5190_DataParams_t * 
     wPktLength = pDataParams->sIrqResp.aISRReadBuf[TLV_LENGTH_MSB_INDEX];
     wPktLength <<=  8;
     wPktLength |= pDataParams->sIrqResp.aISRReadBuf[TLV_LENGTH_LSB_INDEX];
-
+printk("phhalHw_Pn5190_EnBootNormalMode  0x%x \n",wPktLength);
     if (!( (wPktLength == 0x08) || (wPktLength == 0x0C) ))
     {
         return PH_ADD_COMPCODE_FIXED(PH_ERR_INTERFACE_ERROR, PH_COMP_HAL);
