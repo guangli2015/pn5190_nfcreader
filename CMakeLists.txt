@@ -16,6 +16,7 @@ zephyr_include_directories(
    src/NxpNfcRdLib/types
    src/Platform
    src/RTOS
+   src/NxpNfcRdLib/comps/phpalI14443p3a/src/Sw
 )
 ADD_DEFINITIONS(-DPHDRIVER_nRF52840_PNEV5190B_BOARD)
 ADD_DEFINITIONS(-DPH_OSAL_NULLOS)

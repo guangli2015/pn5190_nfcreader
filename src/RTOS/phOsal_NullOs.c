@@ -213,7 +213,7 @@ phStatus_t phOsal_EventPend(volatile phOsal_Event_t * eventHandle, phOsal_EventO
 		}
 
     if (events == 0) {
-         printk("No input devices are available!");
+        // printk("No input devices are available!");
          status = PH_OSAL_IO_TIMEOUT;
     } 
     else {

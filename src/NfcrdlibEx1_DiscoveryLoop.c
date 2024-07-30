@@ -51,12 +51,19 @@
 /* Local headers */
 #include <NfcrdlibEx1_DiscoveryLoop.h>
 #include <NfcrdlibEx1_EmvcoProfile.h>
-
+#include "HKeyBsp.h"
 /*******************************************************************************
 **   Definitions
 *******************************************************************************/
 #if 1
 phacDiscLoop_Sw_DataParams_t       * pDiscLoop;       /* Discovery loop component */
+phpalI14443p4_Sw_DataParams_t * ppalI14443p4;        /* PAL ISO I14443-4 component */
+phpalI14443p4a_Sw_DataParams_t * ppalI14443p4a;      /* PAL ISO I14443-4A component */
+phpalI14443p3a_Sw_DataParams_t * ppalI14443p3a;      /* PAL ISO I14443-A component */
+phpalI14443p3b_Sw_DataParams_t * ppalI14443p3b;      /* PAL ISO I14443-B component */
+phalTop_Sw_DataParams_t *       palTop;    
+phpalFelica_Sw_DataParams_t * ppalFelica;            /* PAL Felica component */
+phpalI14443p4mC_Sw_DataParams_t * ppalI14443p4mC;    /* PAL ISO I14443-4mC Target component */
 
 /*The below variables needs to be initialized according to example requirements by a customer */
 uint8_t  sens_res[2]     = {0x04, 0x00};              /* ATQ bytes - needed for anti-collision */
@@ -66,7 +73,37 @@ uint8_t  nfc_id3         = 0xFA;                      /* NFC3 byte - required fo
 uint8_t  poll_res[18]    = {0x01, 0xFE, 0xB2, 0xB3, 0xB4, 0xB5,
                                    0xB6, 0xB7, 0xC0, 0xC1, 0xC2, 0xC3,
                                    0xC4, 0xC5, 0xC6, 0xC7, 0x23, 0x45 };
+/* VASUP-A Command: TCI must be set according to data received via MFi Program  */
+static uint8_t demoEcpVasup[] = { 0x6A,    /* VASUP-A Command             */
+                                  0x02,    /* Byte1  - Format: 2.0        */
+                                  0xCB,    /* Byte2  - Terminal Info      */
+                                  0x02,    /* Byte3  - Terminal Type      */
+                                  0x04,    /* Byte4  - Terminal Subtype   */
+                                  0x02,    /* Byte5  - TCI 1              */
+                                  0x11,    /* Byte6  - TCI 2              */
+                                  0x00,    /* Byte7  - TCI 3              */
+                                  0xb0,0x2a,0x52,0x74,0xec,0x02,0x13,0x4d,  /* Reader Identifier */
+};
 
+static uint8_t expTransacSelectApp[] = { 0x00, 0xA4, 0x04, 0x00, 0x0c, 0xA0, 0x00, 0x00, 0x08, 0x58, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00};
+uint8_t Atqb[14];
+uint8_t AtqbLen;
+uint8_t Ats[50];
+uint8_t bCidEnabled;
+uint8_t bCid;
+uint8_t bNadSupported;
+uint8_t bFwi;
+uint8_t bFsdi;
+uint8_t bFsci;
+uint8_t bUid[10];
+uint8_t bMoreCardsAvailable;
+uint8_t bLength;
+uint8_t bMbli;
+uint8_t bSak;
+uint8_t *pRxData;
+uint16_t wRxDataLength;
+uint8_t aAppBuffer[4100];
+uint16_t wTxDataLength;
 #ifdef PHOSAL_FREERTOS_STATIC_MEM_ALLOCATION
 uint32_t aDiscTaskBuffer[DISC_DEMO_TASK_STACK];
 #else /* PHOSAL_FREERTOS_STATIC_MEM_ALLOCATION */
@@ -93,7 +130,10 @@ static volatile uint8_t bInfLoop = 1U;
 /*******************************************************************************
 **   Prototypes
 *******************************************************************************/
-
+void *pspalI14443p3a;
+void *pspalI14443p3b;
+void *pspalI14443p4a;
+void *pspalI14443p4;
 void DiscoveryLoop_Demo(void  *pDataParams);
 uint16_t NFCForumProcess(uint16_t wEntryPoint, phStatus_t DiscLoopStatus);
 
@@ -109,8 +149,8 @@ static phStatus_t LoadProfile(phacDiscLoop_Profile_t bProfile);
 
 int main(void)
 {
-    printk("hello nxp 5190@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-    printk("i am coming...............\n");
+    //printk("hello nxp 5190@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+    //printk("i am coming...............\n");
 #ifdef PHDRIVER_nRF52840_PNEV5190B_BOARD
 printk("PHDRIVER_nRF52840_PNEV5190B_BOARD...............\n");
 #endif
@@ -159,6 +199,19 @@ printk("PH_PLATFORM_HAS_ICFRONTEND...............\n");
         pHal = phNfcLib_GetDataParams(PH_COMP_HAL);
         pDiscLoop = phNfcLib_GetDataParams(PH_COMP_AC_DISCLOOP);
 
+
+        ppalI14443p3a = phNfcLib_GetDataParams(PH_COMP_PAL_ISO14443P3A);
+        ppalI14443p3b = phNfcLib_GetDataParams(PH_COMP_PAL_ISO14443P3B);
+        ppalI14443p4 = phNfcLib_GetDataParams(PH_COMP_PAL_ISO14443P4);
+        ppalI14443p4a = phNfcLib_GetDataParams(PH_COMP_PAL_ISO14443P4A);
+        ppalFelica = phNfcLib_GetDataParams(PH_COMP_PAL_FELICA);
+        palTop = phNfcLib_GetDataParams(PH_COMP_AL_TOP);
+
+        pspalI14443p3a  = (void *)ppalI14443p3a;
+        pspalI14443p3b  = (void *)ppalI14443p3b;
+        pspalI14443p4a  = (void *)ppalI14443p4a;
+        pspalI14443p4   = (void *)ppalI14443p4;
+
         /* Initialize other components that are not initialized by NFCLIB and configure Discovery Loop. */
         status = phApp_Comp_Init(pDiscLoop);
         CHECK_STATUS(status);
@@ -191,6 +244,56 @@ printk("PH_PLATFORM_HAS_ICFRONTEND...............\n");
     return 0;
 }
 #if 1
+
+/**
+* \brief Configure Mode
+* This function configures HAL and PAL layers to ISO Mode.
+* \return Status code
+* \retval #PH_ERR_SUCCESS Operation successful.
+* \retval Other Depending on implementation and underlying component.
+*/
+static phStatus_t Configure_Mode(void)
+{
+    phStatus_t wStatus;
+
+    /* Configure HAL to ISO mode */
+    wStatus = phhalHw_SetConfig(
+        pHal,
+        PHHAL_HW_CONFIG_OPE_MODE,
+        RD_LIB_MODE_ISO);
+    CHECK_STATUS(wStatus);
+
+    /* Configure I14443-A PAL to ISO mode */
+    wStatus = phpalI14443p3a_SetConfig(
+        pspalI14443p3a,
+        PHPAL_I14443P3A_CONFIG_OPE_MODE,
+        RD_LIB_MODE_ISO);
+    CHECK_STATUS(wStatus);
+
+    /* Configure I14443-B PAL to ISO mode */
+    wStatus = phpalI14443p3b_SetConfig(
+        pspalI14443p3b,
+        PHPAL_I14443P3B_CONFIG_OPE_MODE,
+        RD_LIB_MODE_ISO);
+    CHECK_STATUS(wStatus);
+
+    /* Configure I14443-4A PAL to ISO mode */
+    wStatus = phpalI14443p4a_SetConfig(
+        pspalI14443p4a,
+        PHPAL_I14443P4A_CONFIG_OPE_MODE,
+        RD_LIB_MODE_ISO);
+    CHECK_STATUS(wStatus);
+
+    /* Configure I14443-4 PAL to ISO mode */
+    wStatus = phpalI14443p4_SetConfig(
+        pspalI14443p4,
+        PHPAL_I14443P4_CONFIG_OPE_MODE,
+        RD_LIB_MODE_ISO);
+    CHECK_STATUS(wStatus);
+
+    /* Return Status */
+    return wStatus;
+}
 /**
 * This function demonstrates the usage of discovery loop.
 * The discovery loop can run with default setting Or can be configured as demonstrated and
@@ -200,8 +303,9 @@ printk("PH_PLATFORM_HAS_ICFRONTEND...............\n");
 */
 void DiscoveryLoop_Demo(void  *pDataParams)
 {
-    phStatus_t    status, statustmp;
+ phStatus_t    status, statustmp ,wStatus;
     uint16_t      wEntryPoint;
+      phacDiscLoop_Sw_DataParams_t * pDataParamsSw = (phacDiscLoop_Sw_DataParams_t *)pDataParams;
     phacDiscLoop_Profile_t bProfile = PHAC_DISCLOOP_PROFILE_UNKNOWN;
 
     /* This call shall allocate secure context before calling any secure function,
@@ -217,9 +321,12 @@ void DiscoveryLoop_Demo(void  *pDataParams)
     bProfile = PHAC_DISCLOOP_PROFILE_EMVCO;
 #endif
     /* Load selected profile for Discovery loop */
+#if 0
     LoadProfile(bProfile);
+#endif
 #endif /* ENABLE_DISC_CONFIG */
-
+ wStatus = Configure_Mode();
+        CHECK_STATUS(wStatus);
 #ifdef NXPBUILD__PHHAL_HW_TARGET
     /* Initialize the setting for Listen Mode */
     status = phApp_HALConfigAutoColl();
@@ -263,8 +370,19 @@ void DiscoveryLoop_Demo(void  *pDataParams)
 #endif /* PH_EXAMPLE1_LPCD_ENABLE*/
 
         /* Start discovery loop */
+#if 0
         status = phacDiscLoop_Run(pDataParams, wEntryPoint);
-
+#endif  
+        status = phhalHw_Lpcd(pDataParamsSw->pHalDataParams);
+         DEBUG_PRINTF (" ecp sent... \n");
+            uint8_t recv_buffer[32];
+    uint16_t recv_size = 32;
+  hkey_bsp_send_ecp(demoEcpVasup, sizeof(demoEcpVasup));
+  //k_msleep(10);
+    hkey_bsp_exchange(expTransacSelectApp,  sizeof(expTransacSelectApp), recv_buffer,&recv_size);
+   // for(int i=0;i<recv_size;i++)
+   // {   DEBUG_PRINTF (" resp:%x ",recv_buffer[i]);   }
+   
         if(bProfile == PHAC_DISCLOOP_PROFILE_EMVCO)
         {
 #if defined(ENABLE_EMVCO_PROF)
@@ -292,6 +410,334 @@ void DiscoveryLoop_Demo(void  *pDataParams)
     }
 }
 
+/**
+* \brief Type A detection
+* This function performs Type A detection.
+* \return Status code
+* \retval #PH_ERR_SUCCESS Operation successful.
+* \retval Other Depending on implementation and underlying component.
+*/
+phStatus_t DetectTypeA(void)
+{
+    phStatus_t wStatus;
+    uint8_t bIndex;
+    uint8_t cnt = 5;
+    while (cnt--)
+    {
+        /* Apply Protocol Setting for Type A */
+        wStatus = phhalHw_ApplyProtocolSettings(pHal, PHHAL_HW_CARDTYPE_ISO14443A);
+        CHECK_STATUS(wStatus);
+
+        /* RF Field ON */
+        wStatus = phhalHw_FieldOn(pHal);
+        if(wStatus != PH_ERR_SUCCESS)
+        {
+            wStatus = phhalHw_Wait(pHal,PHHAL_HW_TIME_MILLISECONDS, 100);
+            continue;
+        }
+        CHECK_STATUS(wStatus);
+        wStatus = phhalHw_Wait(pHal,PHHAL_HW_TIME_MILLISECONDS, 6);
+        CHECK_STATUS(wStatus);
+
+        /* Activate Layer 3A card */
+        wStatus = phpalI14443p3a_ActivateCard(
+            pspalI14443p3a,
+            NULL,
+            0x00,
+            bUid,
+            &bLength,
+            &bSak,
+            &bMoreCardsAvailable);
+        if((bSak & 0x24) == 0x20)    //UID complete, PICC compliant with ISO/IEC 14443-4
+        {
+            DEBUG_PRINTF("found CPU card pSak=0x%x\n",bSak);
+        }  
+        //ESP_LOG_BUFFER_HEX_LEVEL("UID ", bUid, bLength, ESP_LOG_INFO);
+        if (PH_ERR_SUCCESS == (wStatus & PH_ERR_MASK))
+        {
+            /* Find CID to be used */
+            for(bIndex = 0; bIndex < (bLength - 1); bIndex++)
+            {
+                if(bUid[bIndex] == 0xBB)
+                {
+                    bCid = bUid[bIndex + 1];
+                    break;
+                }
+            }
+            
+            /* Send RATS */
+            wStatus = phpalI14443p4a_Rats(
+                pspalI14443p4a,
+                PH_NXPNFCRDLIB_CONFIG_FSDI_VALUE,    /* Fsdi */
+                bCid,
+                Ats);
+            //ESP_LOG_BUFFER_HEX_LEVEL("RATS ", Ats,50, ESP_LOG_INFO);
+            /* Find the baud rates which shall be used */
+            if(bUid[0] == 0xAA)
+            {
+                /* Send PPS */
+                (void)phpalI14443p4a_Pps(
+                    pspalI14443p4a,
+                    (bUid[1] & 0x03),
+                    ((bUid[1] & 0x0C) >> 2));
+
+            }
+
+            if (PH_ERR_SUCCESS == (wStatus & PH_ERR_MASK))
+            {
+                /* Get parameters from 4A */
+                wStatus = phpalI14443p4a_GetProtocolParams(
+                    pspalI14443p4a,
+                    &bCidEnabled,
+                    &bCid,
+                    &bNadSupported,
+                    &bFwi,
+                    &bFsdi,
+                    &bFsci);
+                CHECK_STATUS(wStatus);
+
+                if(bFsci > PH_NXPNFCRDLIB_CONFIG_DEFAULT_FSCI_VALUE)
+                {
+                    bFsci = PH_NXPNFCRDLIB_CONFIG_DEFAULT_FSCI_VALUE;
+                }
+
+                /* Apply parameters to layer 4 */
+                wStatus = phpalI14443p4_SetProtocol(
+                    pspalI14443p4,
+                    bCidEnabled,
+                    bCid,
+                    0,
+                    0,
+                    bFwi,
+                    bFsdi,
+                    bFsci);
+                CHECK_STATUS(wStatus);
+            }
+        }
+        
+        /* Return Status */
+        return wStatus;
+    }
+    return wStatus;
+}
+bool DetectCpuTypeA(void)
+{
+    phStatus_t wStatus;
+    uint8_t bIndex;
+    uint8_t cnt = 5;
+    while (cnt--)
+    {
+        /* Apply Protocol Setting for Type A */
+        wStatus = phhalHw_ApplyProtocolSettings(pHal, PHHAL_HW_CARDTYPE_ISO14443A);
+        CHECK_STATUS(wStatus);
+
+        /* RF Field ON */
+        wStatus = phhalHw_FieldOn(pHal);
+        if(wStatus != PH_ERR_SUCCESS)
+        {
+            wStatus = phhalHw_Wait(pHal,PHHAL_HW_TIME_MILLISECONDS, 100);
+            continue;
+        }
+        CHECK_STATUS(wStatus);
+        wStatus = phhalHw_Wait(pHal,PHHAL_HW_TIME_MILLISECONDS, 6);
+        CHECK_STATUS(wStatus);
+
+        /* Activate Layer 3A card */
+        wStatus = phpalI14443p3a_ActivateCard(
+            pspalI14443p3a,
+            NULL,
+            0x00,
+            bUid,
+            &bLength,
+            &bSak,
+            &bMoreCardsAvailable);
+        if((bSak & 0x24) == 0x20)    //UID complete, PICC compliant with ISO/IEC 14443-4
+        {
+            DEBUG_PRINTF("found CPU card pSak=0x%x\n",bSak);
+        } 
+        else
+        {
+            return false;
+        }   
+        //ESP_LOG_BUFFER_HEX_LEVEL("UID ", bUid, bLength, ESP_LOG_INFO);
+        if (PH_ERR_SUCCESS == (wStatus & PH_ERR_MASK))
+        {
+            /* Find CID to be used */
+            for(bIndex = 0; bIndex < (bLength - 1); bIndex++)
+            {
+                if(bUid[bIndex] == 0xBB)
+                {
+                    bCid = bUid[bIndex + 1];
+                    break;
+                }
+            }
+            
+            /* Send RATS */
+            wStatus = phpalI14443p4a_Rats(
+                pspalI14443p4a,
+                PH_NXPNFCRDLIB_CONFIG_FSDI_VALUE,    /* Fsdi */
+                bCid,
+                Ats);
+            //ESP_LOG_BUFFER_HEX_LEVEL("RATS ", Ats,50, ESP_LOG_INFO);
+            /* Find the baud rates which shall be used */
+            if(bUid[0] == 0xAA)
+            {
+                /* Send PPS */
+                (void)phpalI14443p4a_Pps(
+                    pspalI14443p4a,
+                    (bUid[1] & 0x03),
+                    ((bUid[1] & 0x0C) >> 2));
+
+            }
+
+            if (PH_ERR_SUCCESS == (wStatus & PH_ERR_MASK))
+            {
+                /* Get parameters from 4A */
+                wStatus = phpalI14443p4a_GetProtocolParams(
+                    pspalI14443p4a,
+                    &bCidEnabled,
+                    &bCid,
+                    &bNadSupported,
+                    &bFwi,
+                    &bFsdi,
+                    &bFsci);
+                CHECK_STATUS(wStatus);
+
+                if(bFsci > PH_NXPNFCRDLIB_CONFIG_DEFAULT_FSCI_VALUE)
+                {
+                    bFsci = PH_NXPNFCRDLIB_CONFIG_DEFAULT_FSCI_VALUE;
+                }
+
+                /* Apply parameters to layer 4 */
+                wStatus = phpalI14443p4_SetProtocol(
+                    pspalI14443p4,
+                    bCidEnabled,
+                    bCid,
+                    0,
+                    0,
+                    bFwi,
+                    bFsdi,
+                    bFsci);
+                CHECK_STATUS(wStatus);
+            }
+        }
+        
+        /* Return Status */
+        return true;
+    }
+    return false;
+}
+bool DetectCpuTypeA2(void)
+{
+    phStatus_t wStatus;
+    uint8_t bIndex;
+    uint8_t cnt = 5;
+    while (cnt--)
+    {
+        /* Apply Protocol Setting for Type A */
+        // DEBUG_PRINTF("DetectCpuTypeA 1");
+        // wStatus = phhalHw_ApplyProtocolSettings(pHal, PHHAL_HW_CARDTYPE_ISO14443A);
+        // CHECK_STATUS(wStatus);
+        // DEBUG_PRINTF("DetectCpuTypeA 2");
+        // /* RF Field ON */
+        // wStatus = phhalHw_FieldOn(pHal);
+        // if(wStatus != PH_ERR_SUCCESS)
+        // {
+        //     DEBUG_PRINTF("DetectCpuTypeA delay");
+        //     wStatus = phhalHw_Wait(pHal,PHHAL_HW_TIME_MILLISECONDS, 100);
+        //     continue;
+        // // }
+        // DEBUG_PRINTF("DetectCpuTypeA 2");
+        // CHECK_STATUS(wStatus);
+        // wStatus = phhalHw_Wait(pHal,PHHAL_HW_TIME_MILLISECONDS, 6);
+        // CHECK_STATUS(wStatus);
+        /* Activate Layer 3A card */
+        wStatus = phpalI14443p3a_ActivateCard(
+            pspalI14443p3a,
+            NULL,
+            0x00,
+            bUid,
+            &bLength,
+            &bSak,
+            &bMoreCardsAvailable);
+
+        if((bSak & 0x24) == 0x20)    //UID complete, PICC compliant with ISO/IEC 14443-4
+        {
+            DEBUG_PRINTF("found CPU card pSak=0x%x\n",bSak);
+        } 
+        else
+        {
+            return false;
+        }   
+        //ESP_LOG_BUFFER_HEX_LEVEL("UID ", bUid, bLength, ESP_LOG_INFO);
+        if (PH_ERR_SUCCESS == (wStatus & PH_ERR_MASK))
+        {
+            /* Find CID to be used */
+            for(bIndex = 0; bIndex < (bLength - 1); bIndex++)
+            {
+                if(bUid[bIndex] == 0xBB)
+                {
+                    bCid = bUid[bIndex + 1];
+                    break;
+                }
+            }
+            /* Send RATS */
+            wStatus = phpalI14443p4a_Rats(
+                pspalI14443p4a,
+                PH_NXPNFCRDLIB_CONFIG_FSDI_VALUE,    /* Fsdi */
+                bCid,
+                Ats);
+            //ESP_LOG_BUFFER_HEX_LEVEL("RATS ", Ats,50, ESP_LOG_INFO);
+            /* Find the baud rates which shall be used */
+            if(bUid[0] == 0xAA)
+            {
+                /* Send PPS */
+                (void)phpalI14443p4a_Pps(
+                    pspalI14443p4a,
+                    (bUid[1] & 0x03),
+                    ((bUid[1] & 0x0C) >> 2));
+
+            }
+
+            if (PH_ERR_SUCCESS == (wStatus & PH_ERR_MASK))
+            {
+                /* Get parameters from 4A */
+                wStatus = phpalI14443p4a_GetProtocolParams(
+                    pspalI14443p4a,
+                    &bCidEnabled,
+                    &bCid,
+                    &bNadSupported,
+                    &bFwi,
+                    &bFsdi,
+                    &bFsci);
+                CHECK_STATUS(wStatus);
+                if(bFsci > PH_NXPNFCRDLIB_CONFIG_DEFAULT_FSCI_VALUE)
+                {
+                    bFsci = PH_NXPNFCRDLIB_CONFIG_DEFAULT_FSCI_VALUE;
+                }
+                /* Apply parameters to layer 4 */
+                wStatus = phpalI14443p4_SetProtocol(
+                    pspalI14443p4,
+                    bCidEnabled,
+                    bCid,
+                    0,
+                    0,
+                    bFwi,
+                    bFsdi,
+                    bFsci);
+                CHECK_STATUS(wStatus);
+            }
+        }
+        
+        /* Return Status */
+        return true;
+    }
+    return false;
+}
+
+
+
+
 uint16_t NFCForumProcess(uint16_t wEntryPoint, phStatus_t DiscLoopStatus)
 {
     phStatus_t    status;
@@ -313,6 +759,9 @@ uint16_t NFCForumProcess(uint16_t wEntryPoint, phStatus_t DiscLoopStatus)
             if(PHAC_DISCLOOP_CHECK_ANDMASK(wTechDetected, PHAC_DISCLOOP_POS_BIT_MASK_A))
             {
                 DEBUG_PRINTF (" \tType A detected... \n");
+              
+              
+                
             }
             if(PHAC_DISCLOOP_CHECK_ANDMASK(wTechDetected, PHAC_DISCLOOP_POS_BIT_MASK_B))
             {

@@ -5,6 +5,7 @@
         "phapp_init.h": "c",
         "phdriver.h": "c",
         "phosal.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "phnxpnfcrdlib_config.h": "c"
     }
 }
